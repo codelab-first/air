@@ -1,4 +1,4 @@
-import React, {useState,  useEffect} from 'react';
+import React, {useState,  useEffect, useRef, use} from 'react';
 import { Map, useKakaoLoader } from 'react-kakao-maps-sdk';
 
 
@@ -15,8 +15,16 @@ const MapComponent = () => {
 
   const [address, setAddress] = useState<string>("");
 
+  const mapRef = useRef<kakao.maps.Map | null>(null);
+
   useEffect(() => {
     if (loading) return;
+
+    if (error) {
+      console.error('카카오맵 로딩 실패', error);
+      alert("카카오맵 로딩에 실패했습니다. 새로고침 해주세요.");
+    return ;
+    }
 
     console.log("카카오맵 로딩 완료");
     if (!navigator.geolocation) {
@@ -66,14 +74,22 @@ const MapComponent = () => {
       }
     );
   }, [loading]);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        mapRef.current.relayout();
+        mapRef.current.setCenter(center);
+      }
+    };
 
-  if (loading) {
-    return <div>지도 로딩 중...</div>;
-  }
+    window.addEventListener('resize', handleResize);
 
-  if (error) {
-    return <div>지도 로딩 중 오류가 발생했습니다: {error.message}</div>;
-  }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
 
   return (
@@ -88,6 +104,7 @@ const MapComponent = () => {
           height: "540px",
         }}
         level={9} // 지도의 확대 레벨
+        onCreate={(map) => { mapRef.current = map; }}
       />
       <div style= {{marginTop: "0.75em"}}>
         <strong>현재 위치: </strong> {address}
