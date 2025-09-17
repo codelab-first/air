@@ -16,6 +16,9 @@ const MapComponent = () => {
   const [address, setAddress] = useState<string>("");
 
   useEffect(() => {
+    if (loading) return;
+
+    console.log("카카오맵 로딩 완료");
     if (!navigator.geolocation) {
       alert("사용자의 위치 정보를 가져올 수 없습니다. 기본 위치로 설정됩니다.");
       return;
@@ -24,17 +27,33 @@ const MapComponent = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        console.log('현재 위치 좌표:', latitude, longitude);
         
         if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
           const geocoder = new window.kakao.maps.services.Geocoder();
 
           geocoder.coord2Address(longitude, latitude, (result: any[], status: string) => {
             if (status === window.kakao.maps.services.Status.OK) {
-              const region = result.find((r) => r.region_type === 'H' || r.region_type === 'B');
+              const region = result[0].address;
               if (region) {
-                setPosition({ lat: latitude, lng: longitude });
                 setAddress(region.address_name);
-                console.log('현재 위치 주소:', region.address_name);
+                const county = region.region_2depth_name;
+                const city = region.region_1depth_name;
+                const town = region.region_3depth_name;
+
+                const regionAddress = county + city + town;
+                
+                geocoder.addressSearch(regionAddress, (res: any[], stat: string) => {
+                  if (stat === window.kakao.maps.services.Status.OK) {
+                    const cityCoordinate = res[0];
+                    const lat = cityCoordinate.y;
+                    const lng = cityCoordinate.x;
+                    console.log('지역 좌표:', lat, lng);
+                    setPosition({ lat, lng });
+                  } else {
+                    console.error('좌표를 찾지 못했습니다.', stat);
+                  }
+                });
               }
             }
           });
@@ -46,7 +65,7 @@ const MapComponent = () => {
         console.error('위치 정보를 가져올 수 없습니다.', err);
       }
     );
-  }, []);
+  }, [loading]);
 
   if (loading) {
     return <div>지도 로딩 중...</div>;
