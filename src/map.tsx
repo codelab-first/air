@@ -15,6 +15,11 @@ const MapComponent = () => {
 
   const [address, setAddress] = useState<string>("");
 
+  const[bounds, setBounds] = useState<{
+    sw: { lat: number; lng: number };
+    ne: { lat: number; lng: number };
+  } | null>(null);
+
   const mapRef = useRef<kakao.maps.Map | null>(null);
 
   useEffect(() => {
@@ -91,6 +96,31 @@ const MapComponent = () => {
     };
   }, []);
 
+  const isBoundsEqual = (prevBounds: typeof bounds, newBounds: typeof bounds) => {
+    if (!prevBounds || !newBounds) return false;
+    return(
+      prevBounds.sw.lat === newBounds.sw.lat &&
+      prevBounds.sw.lng === newBounds.sw.lng &&
+      prevBounds.ne.lat === newBounds.ne.lat &&
+      prevBounds.ne.lng === newBounds.ne.lng
+    );
+  }
+  
+  const updateBounds = () => {
+  if (mapRef.current) {
+    const boundsObj = mapRef.current.getBounds();
+    const sw = boundsObj.getSouthWest();
+    const ne = boundsObj.getNorthEast();
+    const newBounds = {
+      sw: { lat: sw.getLat(), lng: sw.getLng() },
+      ne: { lat: ne.getLat(), lng: ne.getLng() },
+    };
+
+    if (!isBoundsEqual(bounds, newBounds)) {
+      setBounds(newBounds);
+    }
+  }
+};
 
   return (
     // Map 내부에서 loading 상태를 관찰하고 있기 때문에 conditional rendering를 하지 않아도 됩니다.
@@ -104,11 +134,22 @@ const MapComponent = () => {
           height: "540px",
         }}
         level={9} // 지도의 확대 레벨
-        onCreate={(map) => { mapRef.current = map; }}
+        onCreate={(map) => { mapRef.current = map; 
+          updateBounds(); }}
+          onIdle={updateBounds}
       />
       <div style= {{marginTop: "0.75em"}}>
         <strong>현재 위치: </strong> {address}
       </div>
+      {bounds && (
+        <div style= {{marginTop: "1em"}}>
+          <strong>지도 경계:</strong><br />
+          <ul>
+            <div>남서쪽: {bounds.sw.lat}, {bounds.sw.lng}</div>
+            <div>북동쪽: {bounds.ne.lat}, {bounds.ne.lng}</div>
+          </ul>
+        </div>
+      )}
     </>
   );
 };
