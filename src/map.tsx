@@ -39,7 +39,10 @@ const MapComponent = () => {
                 setAddress(region.address_name);
                 const county = region.region_2depth_name;
                 const city = region.region_1depth_name;
-                const regionAddress = county + city;
+                const town = region.region_3depth_name;
+
+                const regionAddress = county + city + town;
+                
                 geocoder.addressSearch(regionAddress, (res: any[], stat: string) => {
                   if (stat === window.kakao.maps.services.Status.OK) {
                     const cityCoordinate = res[0];
