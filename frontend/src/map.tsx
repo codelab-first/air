@@ -5,7 +5,7 @@ const MapComponent = () => {
   const [loading, error] = useKakaoLoader({
     appkey: import.meta.env.VITE_KAKAO_API_KEY,
     libraries: ['services', 'clusterer'],
-  }); // 추가 옵션에 대한 타입 (실제 옵션에 따라 조정)
+  });
   
   if (error) {
     return <div>지도 로딩 중 오류가 발생했습니다: {error.message}</div>;
