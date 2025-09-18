@@ -1,157 +1,66 @@
-import React, {useState,  useEffect, useRef, use} from 'react';
-import { Map, useKakaoLoader } from 'react-kakao-maps-sdk';
+import React, { useState, useEffect, useRef, use } from "react"
+import { Map, useKakaoLoader } from "react-kakao-maps-sdk"
 
+import useCurrentLocation from "./Hook/useCurrentLocation"
+import useMapBoundary from "./Hook/useMapBoundary"
+import useMapResize from "./Hook/useMapResize"
+
+import useKakaoApi from "./api/useKakaoApi"
 
 const MapComponent = () => {
-  const [loading, error] = useKakaoLoader({
-    appkey: import.meta.env.VITE_KAKAO_API_KEY,
-    libraries: ['services', 'clusterer'],
-  });
-  
-  const [position, setPosition] = useState({
-    lat: import.meta.env.VITE_DEFAULT_LATITUDE,
-    lng: import.meta.env.VITE_DEFAULT_LONGITUDE,
-  });
+  const { loading: apiLoading, error: apiError } = useKakaoApi()
+  const {
+    position,
+    address,
+    loading: locationLoading,
+    error: locationError,
+  } = useCurrentLocation()
+  const { bounds, updateBounds } = useMapBoundary()
+  const { setMap } = useMapResize()
 
-  const [address, setAddress] = useState<string>("");
-
-  const[bounds, setBounds] = useState<{
-    sw: { lat: number; lng: number };
-    ne: { lat: number; lng: number };
-  } | null>(null);
-
-  const mapRef = useRef<kakao.maps.Map | null>(null);
-
-  useEffect(() => {
-    if (loading) return;
-
-    if (error) {
-      console.error('카카오맵 로딩 실패', error);
-      alert("카카오맵 로딩에 실패했습니다. 새로고침 해주세요.");
-    return ;
-    }
-
-    console.log("카카오맵 로딩 완료");
-    if (!navigator.geolocation) {
-      alert("사용자의 위치 정보를 가져올 수 없습니다. 기본 위치로 설정됩니다.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        console.log('현재 위치 좌표:', latitude, longitude);
-        
-        if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
-          const geocoder = new window.kakao.maps.services.Geocoder();
-
-          geocoder.coord2Address(longitude, latitude, (result: any[], status: string) => {
-            if (status === window.kakao.maps.services.Status.OK) {
-              const region = result[0].address;
-              if (region) {
-                setAddress(region.address_name);
-                const county = region.region_2depth_name;
-                const city = region.region_1depth_name;
-                const town = region.region_3depth_name;
-
-                const regionAddress = county + city + town;
-                
-                geocoder.addressSearch(regionAddress, (res: any[], stat: string) => {
-                  if (stat === window.kakao.maps.services.Status.OK) {
-                    const cityCoordinate = res[0];
-                    const lat = cityCoordinate.y;
-                    const lng = cityCoordinate.x;
-                    console.log('지역 좌표:', lat, lng);
-                    setPosition({ lat, lng });
-                  } else {
-                    console.error('좌표를 찾지 못했습니다.', stat);
-                  }
-                });
-              }
-            }
-          });
-        } else {
-          console.error('카카오맵 API가 로드되지 않았습니다.');
-        }
-      },
-      (err) => {
-        console.error('위치 정보를 가져올 수 없습니다.', err);
-      }
-    );
-  }, [loading]);
-  
-  useEffect(() => {
-    const handleResize = () => {
-      if (mapRef.current) {
-        const center = mapRef.current.getCenter();
-        mapRef.current.relayout();
-        mapRef.current.setCenter(center);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  const isBoundsEqual = (prevBounds: typeof bounds, newBounds: typeof bounds) => {
-    if (!prevBounds || !newBounds) return false;
-    return(
-      prevBounds.sw.lat === newBounds.sw.lat &&
-      prevBounds.sw.lng === newBounds.sw.lng &&
-      prevBounds.ne.lat === newBounds.ne.lat &&
-      prevBounds.ne.lng === newBounds.ne.lng
-    );
-  }
-  
-  const updateBounds = () => {
-  if (mapRef.current) {
-    const boundsObj = mapRef.current.getBounds();
-    const sw = boundsObj.getSouthWest();
-    const ne = boundsObj.getNorthEast();
-    const newBounds = {
-      sw: { lat: sw.getLat(), lng: sw.getLng() },
-      ne: { lat: ne.getLat(), lng: ne.getLng() },
-    };
-
-    if (!isBoundsEqual(bounds, newBounds)) {
-      setBounds(newBounds);
-    }
-  }
-};
+  if (apiLoading || locationLoading) return <div>로딩중...</div>
+  if (apiError) return <div>카카오맵 API 로딩 실패: {apiError.message}</div>
 
   return (
     // Map 내부에서 loading 상태를 관찰하고 있기 때문에 conditional rendering를 하지 않아도 됩니다.
-    
     <>
       <Map
         center={position}
         style={{
           width: "50%", // 지도의 크기
-          minWidth: "520px",
-          height: "540px",
+          minWidth: "480px",
+          height: "480px",
         }}
         level={9} // 지도의 확대 레벨
-        onCreate={(map) => { mapRef.current = map; 
-          updateBounds(); }}
-          onIdle={updateBounds}
+        onCreate={(map) => {
+          setMap(map)
+          updateBounds(map)
+          console.log("지도 생성 완료", map)
+        }}
+        onIdle={(map) => {
+          updateBounds(map)
+          console.log("지도 이동 완료", map)
+        }}
       />
-      <div style= {{marginTop: "0.75em"}}>
+      <div style={{ marginTop: "0.75em" }}>
         <strong>현재 위치: </strong> {address}
       </div>
       {bounds && (
-        <div style= {{marginTop: "1em"}}>
-          <strong>지도 경계:</strong><br />
+        <div style={{ marginTop: "1em" }}>
+          <strong>지도 경계:</strong>
+          <br />
           <ul>
-            <div>남서쪽: {bounds.sw.lat}, {bounds.sw.lng}</div>
-            <div>북동쪽: {bounds.ne.lat}, {bounds.ne.lng}</div>
+            <div>
+              남서쪽: {bounds.sw.lat}, {bounds.sw.lng}
+            </div>
+            <div>
+              북동쪽: {bounds.ne.lat}, {bounds.ne.lng}
+            </div>
           </ul>
         </div>
       )}
     </>
-  );
-};
+  )
+}
 
-export default MapComponent;
+export default MapComponent
